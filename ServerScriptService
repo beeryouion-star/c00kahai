@@ -1,0 +1,31 @@
+local Teams = game:GetService("Teams")
+local Players = game:GetService("Players")
+local DataStoreService = game:GetService("DataStoreService")
+
+local TeamStore = DataStoreService:GetDataStore("TeamSaveSystem")
+
+if not game.ReplicatedStorage:FindFirstChild("TeamChangeEvent") then
+	local ev = Instance.new("RemoteEvent")
+	ev.Name = "TeamChangeEvent"
+	ev.Parent = game.ReplicatedStorage
+end
+
+game.ReplicatedStorage.TeamChangeEvent.OnServerEvent:Connect(function(plr, teamName)
+	if Teams:FindFirstChild(teamName) then
+		plr.Team = Teams[teamName]
+		plr.TeamColor = Teams[teamName].TeamColor
+		pcall(function()
+			TeamStore:SetAsync(plr.UserId, teamName)
+		end)
+	end
+end)
+
+Players.PlayerAdded:Connect(function(plr)
+	pcall(function()
+		local savedTeam = TeamStore:GetAsync(plr.UserId)
+		if savedTeam and Teams:FindFirstChild(savedTeam) then
+			plr.Team = Teams[savedTeam]
+			plr.TeamColor = Teams[savedTeam].TeamColor
+		end
+	end)
+end)
