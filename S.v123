@@ -1,0 +1,61 @@
+-- 🔥 ระบบเสกทีมแบบมีรหัสลับ (จำข้ามแมพ)
+-- สร้างโดย c00kaha
+
+local DataStoreService = game:GetService("DataStoreService")
+local Teams = game:GetService("Teams")
+local Players = game:GetService("Players")
+
+-- 🔑 ตั้งรหัสลับที่อนุญาตให้เปลี่ยนทีมได้
+local Password = "12345" -- เปลี่ยนรหัสได้ตรงนี้
+
+-- 💾 DataStore สำหรับจำทีม
+local teamDataStore = DataStoreService:GetDataStore("SecureTeamSystem")
+
+-- 🔁 ฟังก์ชันเปลี่ยนทีม
+local function changeTeam(player, teamName)
+	local team = Teams:FindFirstChild(teamName)
+	if team then
+		player.Team = team
+		player.TeamColor = team.TeamColor
+		print(player.Name .. " เปลี่ยนทีมเป็น " .. teamName)
+
+		-- บันทึกชื่อทีมไว้ใน DataStore
+		local success, err = pcall(function()
+			teamDataStore:SetAsync(player.UserId, teamName)
+		end)
+		if not success then
+			warn("บันทึกทีมไม่สำเร็จ: " .. err)
+		end
+	else
+		player:Kick("❌ ไม่พบทีมชื่อ '" .. teamName .. "' ❌")
+	end
+end
+
+-- 🧩 โหลดทีมเดิมเมื่อเข้าเกม
+Players.PlayerAdded:Connect(function(player)
+	local success, teamName = pcall(function()
+		return teamDataStore:GetAsync(player.UserId)
+	end)
+
+	if success and teamName then
+		local team = Teams:FindFirstChild(teamName)
+		if team then
+			player.Team = team
+			player.TeamColor = team.TeamColor
+			print("โหลดทีมของ " .. player.Name .. ": " .. teamName)
+		end
+	end
+
+	-- 💬 ระบบรับคำสั่งผ่านแชท
+	player.Chatted:Connect(function(msg)
+		-- รูปแบบคำสั่ง: !team <ชื่อทีม> <รหัส>
+		local command, teamName, key = msg:match("^!(%w+)%s+(%w+)%s*(.*)$")
+		if command == "team" then
+			if key == Password then
+				changeTeam(player, teamName)
+			else
+				player:Kick("❌ รหัสไม่ถูกต้อง ❌")
+			end
+		end
+	end)
+        end)
