@@ -1,0 +1,279 @@
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+
+local REMOTE_NAMES = {
+    Show = "RequestShowBillboard",
+    Sound = "RequestPlaySound",
+    Effect = "RequestEffect"
+}
+
+local function ensureRemotesOnServer()
+    local reShow = ReplicatedStorage:FindFirstChild(REMOTE_NAMES.Show)
+    local reSound = ReplicatedStorage:FindFirstChild(REMOTE_NAMES.Sound)
+    local reEffect = ReplicatedStorage:FindFirstChild(REMOTE_NAMES.Effect)
+
+    if not reShow then
+        reShow = Instance.new("RemoteEvent")
+        reShow.Name = REMOTE_NAMES.Show
+        reShow.Parent = ReplicatedStorage
+    end
+    if not reSound then
+        reSound = Instance.new("RemoteEvent")
+        reSound.Name = REMOTE_NAMES.Sound
+        reSound.Parent = ReplicatedStorage
+    end
+    if not reEffect then
+        reEffect = Instance.new("RemoteEvent")
+        reEffect.Name = REMOTE_NAMES.Effect
+        reEffect.Parent = ReplicatedStorage
+    end
+
+    return reShow, reSound, reEffect
+end
+
+local function getRemotesClient()
+    local reShow = ReplicatedStorage:WaitForChild(REMOTE_NAMES.Show)
+    local reSound = ReplicatedStorage:WaitForChild(REMOTE_NAMES.Sound)
+    local reEffect = ReplicatedStorage:WaitForChild(REMOTE_NAMES.Effect)
+    return reShow, reSound, reEffect
+end
+
+local function initServer()
+    local RE_Show, RE_Sound, RE_Effect = ensureRemotesOnServer()
+
+    RE_Show.OnServerEvent:Connect(function(playerSender, data)
+        local msg = tostring((data and data.message) or (playerSender.Name .. " 💫 c00kaha"))
+        local dur = tonumber((data and data.duration) or 5)
+        for _, pl in pairs(Players:GetPlayers()) do
+            local pg = pl:FindFirstChild("PlayerGui")
+            if pg then
+                local billboard = Instance.new("BillboardGui")
+                billboard.Name = "c00kahaBillboard"
+                billboard.Size = UDim2.new(0,250,0,60)
+                billboard.AlwaysOnTop = true
+                billboard.Parent = pg
+
+                local frame = Instance.new("Frame", billboard)
+                frame.Size = UDim2.new(1,0,1,0)
+                frame.BackgroundTransparency = 0.2
+                frame.BorderSizePixel = 0
+
+                local label = Instance.new("TextLabel", frame)
+                label.Size = UDim2.new(1,0,1,0)
+                label.BackgroundTransparency = 1
+                label.Text = msg
+                label.TextScaled = true
+                label.Font = Enum.Font.GothamBold
+                label.TextColor3 = Color3.new(1,1,1)
+
+                spawn(function()
+                    local t = 0
+                    while billboard and billboard.Parent and t < dur do
+                        frame.BackgroundColor3 = Color3.fromHSV((t/6) % 1, 1, 1)
+                        t = t + 0.1
+                        task.wait(0.1)
+                    end
+                    if billboard and billboard.Parent then
+                        billboard:Destroy()
+                    end
+                end)
+            end
+        end
+    end)
+
+    RE_Sound.OnServerEvent:Connect(function(playerSender, data)
+        local soundId = tostring((data and data.soundId) or "")
+        local vol = tonumber((data and data.volume) or 1)
+        if soundId == "" then
+            warn("[c00kaha] PlaySound called with empty soundId by", playerSender.Name)
+            return
+        end
+        local sound = Instance.new("Sound", workspace)
+        sound.SoundId = soundId
+        sound.Volume = vol
+        sound.PlaybackSpeed = tonumber((data and data.pitch) or 1)
+        sound:Play()
+        task.delay(10, function()
+            if sound and sound.Parent then sound:Destroy() end
+        end)
+    end)
+
+    RE_Effect.OnServerEvent:Connect(function(playerSender, effectName)
+        local char = playerSender.Character
+        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+        local hrp = char.HumanoidRootPart
+
+        if effectName == "Rainbow" then
+            local emitter = Instance.new("ParticleEmitter")
+            emitter.Name = "c00kahaRainbow"
+            emitter.Texture = "rbxassetid://241837157"
+            emitter.Rate = 150
+            emitter.Lifetime = NumberRange.new(1)
+            emitter.Speed = NumberRange.new(2,6)
+            emitter.Parent = hrp
+            task.delay(5, function() if emitter and emitter.Parent then emitter:Destroy() end end)
+
+        elseif effectName == "Flame" then
+            local f = Instance.new("Fire")
+            f.Name = "c00kahaFire"
+            f.Heat = 10
+            f.Size = 8
+            f.Parent = hrp
+            task.delay(5, function() if f and f.Parent then f:Destroy() end end)
+
+        elseif effectName == "Spin" then
+            spawn(function()
+                for i=1,30 do
+                    if hrp and hrp.Parent then
+                        hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(12), 0)
+                    end
+                    task.wait(0.05)
+                end
+            end)
+
+        elseif effectName == "Launch" then
+            if hrp then
+                hrp.Velocity = Vector3.new(0, 90, 0)
+            end
+
+        elseif effectName == "Firework" then
+            local p = Instance.new("Part")
+            p.Size = Vector3.new(1,1,1)
+            p.Anchored = true
+            p.CanCollide = false
+            p.Transparency = 1
+            p.CFrame = hrp.CFrame * CFrame.new(0,10,0)
+            p.Parent = workspace
+
+            local emitter = Instance.new("ParticleEmitter", p)
+            emitter.Texture = "rbxassetid://259364135"
+            emitter.Rate = 200
+            emitter.Lifetime = NumberRange.new(1.5)
+            task.delay(2.5, function() if p and p.Parent then p:Destroy() end end)
+
+        elseif effectName == "Flash" then
+            local light = Instance.new("PointLight", hrp)
+            light.Brightness = 12
+            light.Range = 15
+            task.wait(0.5)
+            if light and light.Parent then light:Destroy() end
+        end
+    end)
+
+    print("[c00kaha] Server initialized.")
+end
+
+local function buildClientGUI(player)
+    local RE_Show, RE_Sound, RE_Effect = getRemotesClient()
+    local pg = player:WaitForChild("PlayerGui")
+    local existing = pg:FindFirstChild("c00kaha_GUI")
+    if existing then existing:Destroy() end
+
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "c00kaha_GUI"
+    screenGui.ResetOnSpawn = false
+    screenGui.Parent = pg
+
+    local frame = Instance.new("Frame", screenGui)
+    frame.Size = UDim2.new(0,420,0,540)
+    frame.Position = UDim2.new(0.04,0,0.12,0)
+    frame.BackgroundTransparency = 0.15
+    frame.BorderSizePixel = 0
+
+    local grad = Instance.new("UIGradient", frame)
+    grad.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255,0,0)),
+        ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255,127,0)),
+        ColorSequenceKeypoint.new(0.34, Color3.fromRGB(255,255,0)),
+        ColorSequenceKeypoint.new(0.51, Color3.fromRGB(0,255,0)),
+        ColorSequenceKeypoint.new(0.68, Color3.fromRGB(0,0,255)),
+        ColorSequenceKeypoint.new(0.85, Color3.fromRGB(75,0,130)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(148,0,211)),
+    }
+    TweenService:Create(grad, TweenInfo.new(6, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1, true), {Rotation = 360}):Play()
+
+    local title = Instance.new("TextLabel", frame)
+    title.Size = UDim2.new(1,0,0,50)
+    title.Position = UDim2.new(0,0,0,0)
+    title.Text = "🌈 c00kaha Control Panel 🌈"
+    title.Font = Enum.Font.GothamBold
+    title.TextScaled = true
+    title.BackgroundTransparency = 1
+    title.TextColor3 = Color3.new(1,1,1)
+
+    local content = Instance.new("Frame", frame)
+    content.Size = UDim2.new(1,-12,1,-60)
+    content.Position = UDim2.new(0,6,0,56)
+    content.BackgroundTransparency = 1
+
+    local function makeBtn(text, y)
+        local b = Instance.new("TextButton", content)
+        b.Size = UDim2.new(1,0,0,38)
+        b.Position = UDim2.new(0,0,0,(y-1)*44)
+        b.BackgroundTransparency = 0.25
+        b.Font = Enum.Font.GothamSemibold
+        b.TextSize = 18
+        b.Text = text
+        b.TextColor3 = Color3.new(1,1,1)
+        return b
+    end
+
+    local btnShow = makeBtn("โชว์ป้ายลอย 🌈", 1)
+    local btnPlay = makeBtn("เปิดเพลงธีม 🔊", 2)
+    local btnRainbow = makeBtn("ยิงสายรุ้ง 🌈", 3)
+    local btnFlame = makeBtn("สร้างไฟรอบตัว 🔥", 4)
+    local btnSpin = makeBtn("พายุหมุน 🌪", 5)
+    local btnDance = makeBtn("เต้น Emote 😎", 6)
+    local btnLaunch = makeBtn("เด้งขึ้นฟ้า ⚡", 7)
+    local btnFirework = makeBtn("ดอกไม้ไฟ 🎆", 8)
+    local btnFlash = makeBtn("ระเบิดแสง 💥", 9)
+    local btnReset = makeBtn("รีเซ็ตตัวเอง 🧍‍♂️", 10)
+    local btnClose = makeBtn("ปิด GUI 🔒", 11)
+
+    btnShow.MouseButton1Click:Connect(function()
+        RE_Show:FireServer({message = player.Name.." 💫 c00kaha", duration = 6})
+    end)
+    btnPlay.MouseButton1Click:Connect(function()
+        RE_Sound:FireServer({soundId = "rbxassetid://1843896161", volume = 1})
+    end)
+    btnRainbow.MouseButton1Click:Connect(function() RE_Effect:FireServer("Rainbow") end)
+    btnFlame.MouseButton1Click:Connect(function() RE_Effect:FireServer("Flame") end)
+    btnSpin.MouseButton1Click:Connect(function() RE_Effect:FireServer("Spin") end)
+    btnDance.MouseButton1Click:Connect(function()
+        local char = player.Character
+        if char and char:FindFirstChild("Humanoid") then
+            for i=1,6 do
+                if char and char.PrimaryPart then
+                    char:SetPrimaryPartCFrame(char:GetPrimaryPartCFrame() * CFrame.new(0,0,0))
+                end
+                task.wait(0.08)
+            end
+        end
+    end)
+    btnLaunch.MouseButton1Click:Connect(function() RE_Effect:FireServer("Launch") end)
+    btnFirework.MouseButton1Click:Connect(function() RE_Effect:FireServer("Firework") end)
+    btnFlash.MouseButton1Click:Connect(function() RE_Effect:FireServer("Flash") end)
+    btnReset.MouseButton1Click:Connect(function() player:LoadCharacter() end)
+    btnClose.MouseButton1Click:Connect(function() screenGui.Enabled = false end)
+end
+
+local function initClient()
+    local player = Players.LocalPlayer
+    if not player then return end
+    local ok, err = pcall(function()
+        buildClientGUI(player)
+    end)
+    if not ok then
+        warn("[c00kaha] failed to build client GUI:", err)
+    else
+        print("[c00kaha] Client GUI created.")
+    end
+end
+
+if RunService:IsServer() then
+    initServer()
+elseif RunService:IsClient() then
+    initClient()
+end
