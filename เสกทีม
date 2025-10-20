@@ -1,0 +1,101 @@
+--===[ ส่วนประกาศ Service ]===--
+local Players = game:GetService("Players")
+local Teams = game:GetService("Teams")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local DataStoreService = game:GetService("DataStoreService")
+
+--===[ RemoteEvent สำหรับเชื่อม GUI กับ Server ]===--
+local remote = ReplicatedStorage:FindFirstChild("ChangeTeam") or Instance.new("RemoteEvent", ReplicatedStorage)
+remote.Name = "ChangeTeam"
+
+--===[ DataStore สำหรับเก็บทีมถาวร ]===--
+local teamStore = DataStoreService:GetDataStore("PlayerTeams_c00kakh")
+
+--===[ ฟังก์ชันเปลี่ยนทีมบน Server ]===--
+local function setTeam(player, teamName)
+	if not teamName or teamName == "" then return end
+	local team = Teams:FindFirstChild(teamName)
+	if not team then
+		team = Instance.new("Team")
+		team.Name = teamName
+		team.TeamColor = BrickColor.Random()
+		team.AutoAssignable = false
+		team.Parent = Teams
+	end
+	player.Team = team
+	player.TeamColor = team.TeamColor
+end
+
+remote.OnServerEvent:Connect(function(player, teamName)
+	if typeof(teamName) == "string" then
+		setTeam(player, teamName)
+		pcall(function()
+			teamStore:SetAsync(player.UserId, teamName)
+		end)
+	end
+end)
+
+Players.PlayerAdded:Connect(function(player)
+	pcall(function()
+		local savedTeam = teamStore:GetAsync(player.UserId)
+		if savedTeam then
+			setTeam(player, savedTeam)
+		end
+	end)
+end)
+
+--===[ GUI ส่วนแสดงผลบนหน้าจอผู้เล่น ]===--
+Players.PlayerAdded:Connect(function(player)
+	player.CharacterAdded:Wait()
+	
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "TeamSelector"
+	gui.ResetOnSpawn = false
+	gui.Parent = player:WaitForChild("PlayerGui")
+
+	local frame = Instance.new("Frame")
+	frame.Size = UDim2.new(0, 300, 0, 160)
+	frame.Position = UDim2.new(0.5, -150, 0.5, -80)
+	frame.BackgroundColor3 = Color3.fromRGB(255,255,255)
+	frame.Active = true
+	frame.Draggable = true
+	frame.Parent = gui
+
+	local title = Instance.new("TextLabel")
+	title.Text = "ระบบเลือกทีมถาวร"
+	title.Size = UDim2.new(1, 0, 0, 30)
+	title.BackgroundColor3 = Color3.fromRGB(0,120,255)
+	title.TextColor3 = Color3.fromRGB(255,255,255)
+	title.Parent = frame
+
+	local box = Instance.new("TextBox")
+	box.PlaceholderText = "ใส่ชื่อทีมที่ต้องการ"
+	box.Size = UDim2.new(1, -20, 0, 40)
+	box.Position = UDim2.new(0, 10, 0, 40)
+	box.BackgroundColor3 = Color3.fromRGB(240,240,240)
+	box.TextColor3 = Color3.new(0,0,0)
+	box.Parent = frame
+
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.new(1, -20, 0, 40)
+	button.Position = UDim2.new(0, 10, 0, 90)
+	button.BackgroundColor3 = Color3.fromRGB(0,120,255)
+	button.TextColor3 = Color3.new(1,1,1)
+	button.Text = "เข้าทีม"
+	button.Parent = frame
+
+	local credit = Instance.new("TextLabel")
+	credit.Text = "สร้างโดย c00kakh"
+	credit.Size = UDim2.new(1, 0, 0, 20)
+	credit.Position = UDim2.new(0, 0, 1, -20)
+	credit.BackgroundTransparency = 1
+	credit.TextColor3 = Color3.fromRGB(120,120,120)
+	credit.TextScaled = true
+	credit.Parent = frame
+
+	button.MouseButton1Click:Connect(function()
+		if box.Text ~= "" then
+			remote:FireServer(box.Text)
+		end
+	end)
+end)
