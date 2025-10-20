@@ -1,0 +1,122 @@
+-- 🧠 Script เปลี่ยนทีม + ระบบรหัส + บันทึกทีมถาวร
+-- 🔥 สร้างโดย c00kaha 🔥
+
+-- ตั้งรหัสไว้ตรงนี้
+local ownerKey = "12345"
+
+-- บริการที่ใช้
+local Players = game:GetService("Players")
+local Teams = game:GetService("Teams")
+local DataStoreService = game:GetService("DataStoreService")
+local teamStore = DataStoreService:GetDataStore("SavedTeams")
+
+local player = Players.LocalPlayer
+
+-- 🧱 GUI สร้างในโค้ดเดียว (ไม่ต้องสร้างใน Studio)
+local ScreenGui = Instance.new("ScreenGui")
+local Frame = Instance.new("Frame")
+local Title = Instance.new("TextLabel")
+local TeamBox = Instance.new("TextBox")
+local ChangeButton = Instance.new("TextButton")
+local PasswordBox = Instance.new("TextBox")
+local ConfirmButton = Instance.new("TextButton")
+
+ScreenGui.Name = "TeamGUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = player:WaitForChild("PlayerGui")
+
+-- GUI หลัก (เปลี่ยนทีม)
+Frame.Size = UDim2.new(0, 250, 0, 150)
+Frame.Position = UDim2.new(0.5, -125, 0.5, -75)
+Frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+Frame.Active = true
+Frame.Draggable = true
+Frame.Visible = false
+Frame.Parent = ScreenGui
+
+Title.Size = UDim2.new(1, 0, 0, 25)
+Title.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+Title.Text = "เปลี่ยนทีม (By c00kaha)"
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.Parent = Frame
+
+TeamBox.PlaceholderText = "ใส่ชื่อทีม..."
+TeamBox.Size = UDim2.new(1, -20, 0, 30)
+TeamBox.Position = UDim2.new(0, 10, 0, 40)
+TeamBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+TeamBox.TextColor3 = Color3.new(0, 0, 0)
+TeamBox.Parent = Frame
+
+ChangeButton.Text = "เปลี่ยนทีม"
+ChangeButton.Size = UDim2.new(1, -20, 0, 30)
+ChangeButton.Position = UDim2.new(0, 10, 0, 80)
+ChangeButton.BackgroundColor3 = Color3.fromRGB(0, 100, 255)
+ChangeButton.TextColor3 = Color3.new(1, 1, 1)
+ChangeButton.Parent = Frame
+
+-- หน้ารหัสก่อนเข้า GUI
+PasswordBox.PlaceholderText = "ใส่รหัส..."
+PasswordBox.Size = UDim2.new(0, 200, 0, 30)
+PasswordBox.Position = UDim2.new(0.5, -100, 0.5, -15)
+PasswordBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+PasswordBox.TextColor3 = Color3.new(0, 0, 0)
+PasswordBox.Parent = ScreenGui
+
+ConfirmButton.Text = "ยืนยัน"
+ConfirmButton.Size = UDim2.new(0, 200, 0, 30)
+ConfirmButton.Position = UDim2.new(0.5, -100, 0.5, 25)
+ConfirmButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+ConfirmButton.TextColor3 = Color3.new(1, 1, 1)
+ConfirmButton.Parent = ScreenGui
+
+-- ✅ เมื่อใส่รหัสถูกต้อง
+ConfirmButton.MouseButton1Click:Connect(function()
+	if PasswordBox.Text == ownerKey then
+		PasswordBox.Visible = false
+		ConfirmButton.Visible = false
+		Frame.Visible = true
+	else
+		PasswordBox.Text = "❌ รหัสผิด!"
+	end
+end)
+
+-- 🔄 เปลี่ยนทีม (และบันทึก)
+ChangeButton.MouseButton1Click:Connect(function()
+	local teamName = TeamBox.Text
+	if Teams:FindFirstChild(teamName) then
+		player.Team = Teams[teamName]
+		player.TeamColor = Teams[teamName].TeamColor
+		TeamBox.Text = "✅ เปลี่ยนทีมเรียบร้อย!"
+		
+		-- บันทึกทีมใน DataStore ผ่าน RemoteEvent
+		game.ReplicatedStorage.SaveTeam:FireServer(teamName)
+	else
+		TeamBox.Text = "❌ ไม่พบทีมนี้!"
+	end
+end)
+
+-- 🛰️ สร้าง RemoteEvent สำหรับบันทึกทีม (ใช้ได้ทุกแมพ)
+if not game.ReplicatedStorage:FindFirstChild("SaveTeam") then
+	local ev = Instance.new("RemoteEvent")
+	ev.Name = "SaveTeam"
+	ev.Parent = game.ReplicatedStorage
+end
+
+-- 🔧 ฝั่ง Server สำหรับจัดการ DataStore
+if game:GetService("RunService"):IsServer() then
+	game.ReplicatedStorage.SaveTeam.OnServerEvent:Connect(function(plr, teamName)
+		pcall(function()
+			teamStore:SetAsync(plr.UserId, teamName)
+		end)
+	end)
+
+	Players.PlayerAdded:Connect(function(plr)
+		pcall(function()
+			local savedTeam = teamStore:GetAsync(plr.UserId)
+			if savedTeam and Teams:FindFirstChild(savedTeam) then
+				plr.Team = Teams[savedTeam]
+				plr.TeamColor = Teams[savedTeam].TeamColor
+			end
+		end)
+	end)
+end
