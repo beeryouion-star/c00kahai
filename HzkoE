@@ -1,0 +1,52 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local PathfindingService = game:GetService("PathfindingService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local hrp = character:WaitForChild("HumanoidRootPart")
+local humanoid = character:WaitForChild("Humanoid")
+
+local radius = 10
+local speed = 2
+local center = hrp.Position
+local angle = 0
+local active = true
+local path = nil
+
+local function startSpin()
+    active = true
+end
+
+local function stopSpin()
+    active = false
+end
+
+local function goToPosition(targetPos)
+    path = PathfindingService:CreatePath({
+        AgentRadius = 2,
+        AgentHeight = 5,
+        AgentCanJump = true,
+        AgentJumpHeight = 10,
+        AgentMaxSlope = 45,
+    })
+    path:ComputeAsync(hrp.Position, targetPos)
+    path:MoveTo(character)
+end
+
+local function setEventPoint(pos)
+    center = pos
+    goToPosition(pos)
+end
+
+RunService.RenderStepped:Connect(function(deltaTime)
+    if active then
+        angle = angle + speed * deltaTime * math.pi * 2
+        local newX = center.X + math.cos(angle) * radius
+        local newZ = center.Z + math.sin(angle) * radius
+        hrp.CFrame = CFrame.new(Vector3.new(newX, hrp.Position.Y, newZ))
+    end
+end)
+
+print("Auto Spin Event Script Loaded!")
+print("ใช้ startSpin() เพื่อเริ่ม, stopSpin() เพื่อหยุด, setEventPoint(Vector3.new(x,y,z)) เพื่อไป Event")
