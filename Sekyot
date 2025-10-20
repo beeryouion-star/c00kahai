@@ -1,0 +1,295 @@
+local Players = game:GetService("Players")
+local TeamsService = game:GetService("Teams")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local DataStoreService = game:GetService("DataStoreService")
+local StarterGui = game:GetService("StarterGui")
+
+local DATASTORE_NAME = "PlayerTeam_v1_c00kaha"
+local remoteName = "TeamChangeEvent_c00kaha"
+local guiName = "c00kaha"
+
+local remote = ReplicatedStorage:FindFirstChild(remoteName)
+if not remote then
+    remote = Instance.new("RemoteEvent")
+    remote.Name = remoteName
+    remote.Parent = ReplicatedStorage
+end
+
+local ds = DataStoreService:GetDataStore(DATASTORE_NAME)
+
+local function trim(s)
+    if not s then return "" end
+    return tostring(s):gsub("^%s*(.-)%s*$", "%1")
+end
+
+local function EnsureTeamExists(teamName)
+    if not teamName or teamName == "" then return nil end
+    local lname = string.lower(teamName)
+    for _, t in ipairs(TeamsService:GetTeams()) do
+        if string.lower(t.Name) == lname then
+            return t
+        end
+    end
+    local newTeam = Instance.new("Team")
+    newTeam.Name = teamName
+    newTeam.AutoAssignable = false
+    newTeam.TeamColor = BrickColor.random()
+    newTeam.Parent = TeamsService
+    return newTeam
+end
+
+local function SetPlayerTeam(player, teamName)
+    if not player or not teamName or teamName == "" then
+        return false, "ชื่อทีมไม่ถูกต้อง"
+    end
+    local team = EnsureTeamExists(teamName)
+    if not team then
+        return false, "สร้างทีมไม่สำเร็จ"
+    end
+    player.Team = team
+    player.Neutral = false
+    local success, err = pcall(function()
+        ds:SetAsync("player_" .. player.UserId, team.Name)
+    end)
+    if not success then
+        warn("[c00kaha] DataStore SetAsync failed for", player.Name, err)
+    end
+    return true
+end
+
+Players.PlayerAdded:Connect(function(player)
+    local saved
+    local ok, err = pcall(function()
+        saved = ds:GetAsync("player_" .. player.UserId)
+    end)
+    if ok and type(saved) == "string" and saved ~= "" then
+        local success, reason = SetPlayerTeam(player, saved)
+        if not success then
+            warn("[c00kaha] Fail to set saved team for " .. player.Name .. ": " .. tostring(reason))
+        end
+    end
+end)
+
+local lastChangeTime = {}
+
+remote.OnServerEvent:Connect(function(player, data)
+    if type(data) ~= "table" then
+        remote:FireClient(player, { success = false, message = "ข้อมูลผิดรูปแบบ" })
+        return
+    end
+    local teamName = trim(data.teamName or "")
+    if teamName == "" then
+        remote:FireClient(player, { success = false, message = "กรุณากรอกชื่อทีม" })
+        return
+    end
+    local now = os.time()
+    local last = lastChangeTime[player.UserId] or 0
+    if now - last < 5 then
+        remote:FireClient(player, { success = false, message = "กรุณารออีก "..(5 - (now - last)).." วินาทีก่อนเปลี่ยนทีมอีกครั้ง" })
+        return
+    end
+    lastChangeTime[player.UserId] = now
+    local ok, reason = SetPlayerTeam(player, teamName)
+    if ok then
+        remote:FireClient(player, { success = true, message = "คุณย้ายไปทีม "..teamName })
+    else
+        remote:FireClient(player, { success = false, message = tostring(reason) })
+    end
+end)
+
+if not StarterGui:FindFirstChild(guiName) then
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = guiName
+    screenGui.ResetOnSpawn = true
+    screenGui.Parent = StarterGui
+
+    local frame = Instance.new("Frame")
+    frame.Name = "MainFrame"
+    frame.Size = UDim2.new(0, 520, 0, 260)
+    frame.Position = UDim2.new(0.5, 0, 0.45, 0)
+    frame.AnchorPoint = Vector2.new(0.5, 0.5)
+    frame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+    frame.BorderSizePixel = 0
+    frame.Parent = screenGui
+    frame.Visible = false
+
+    local title = Instance.new("TextLabel")
+    title.Name = "Title"
+    title.Size = UDim2.new(1, -20, 0, 36)
+    title.Position = UDim2.new(0, 10, 0, 10)
+    title.BackgroundTransparency = 1
+    title.Text = "เลือกทีม"
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 20
+    title.TextColor3 = Color3.fromRGB(240,240,240)
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.Parent = frame
+
+    local instr = Instance.new("TextLabel")
+    instr.Name = "Instr"
+    instr.Size = UDim2.new(1, -20, 0, 20)
+    instr.Position = UDim2.new(0, 10, 0, 46)
+    instr.BackgroundTransparency = 1
+    instr.Text = "พิมพ์ชื่อทีมที่ต้องการแล้วกด ยืนยัน (รองรับทุกทีม/ทุกแมพ)"
+    instr.Font = Enum.Font.Gotham
+    instr.TextSize = 14
+    instr.TextColor3 = Color3.fromRGB(200,200,200)
+    instr.TextXAlignment = Enum.TextXAlignment.Left
+    instr.Parent = frame
+
+    local textbox = Instance.new("TextBox")
+    textbox.Name = "TeamTextBox"
+    textbox.Size = UDim2.new(1, -40, 0, 48)
+    textbox.Position = UDim2.new(0, 20, 0, 80)
+    textbox.PlaceholderText = "พิมพ์ชื่อทีม เช่น Army, Police, Civilian หรือทีมในแมพ"
+    textbox.Font = Enum.Font.Gotham
+    textbox.TextSize = 18
+    textbox.TextColor3 = Color3.fromRGB(12,12,12)
+    textbox.BackgroundColor3 = Color3.fromRGB(240,240,240)
+    textbox.BorderSizePixel = 0
+    textbox.ClearTextOnFocus = false
+    textbox.Text = ""
+    textbox.Parent = frame
+
+    local confirmBtn = Instance.new("TextButton")
+    confirmBtn.Name = "ConfirmButton"
+    confirmBtn.Size = UDim2.new(0, 180, 0, 44)
+    confirmBtn.Position = UDim2.new(0, 20, 0, 140)
+    confirmBtn.AnchorPoint = Vector2.new(0,0)
+    confirmBtn.BackgroundColor3 = Color3.fromRGB(28, 120, 255)
+    confirmBtn.BorderSizePixel = 0
+    confirmBtn.Font = Enum.Font.GothamBold
+    confirmBtn.TextSize = 18
+    confirmBtn.TextColor3 = Color3.fromRGB(255,255,255)
+    confirmBtn.Text = "ยืนยัน"
+    confirmBtn.Parent = frame
+
+    local cancelBtn = Instance.new("TextButton")
+    cancelBtn.Name = "CancelButton"
+    cancelBtn.Size = UDim2.new(0, 120, 0, 44)
+    cancelBtn.Position = UDim2.new(0, 220, 0, 140)
+    cancelBtn.BackgroundColor3 = Color3.fromRGB(60,60,70)
+    cancelBtn.BorderSizePixel = 0
+    cancelBtn.Font = Enum.Font.Gotham
+    cancelBtn.TextSize = 16
+    cancelBtn.TextColor3 = Color3.fromRGB(220,220,220)
+    cancelBtn.Text = "ยกเลิก"
+    cancelBtn.Parent = frame
+
+    local msg = Instance.new("TextLabel")
+    msg.Name = "MessageLabel"
+    msg.Size = UDim2.new(1, -40, 0, 28)
+    msg.Position = UDim2.new(0, 20, 0, 196)
+    msg.BackgroundTransparency = 1
+    msg.Font = Enum.Font.Gotham
+    msg.TextSize = 16
+    msg.TextColor3 = Color3.fromRGB(200,200,200)
+    msg.Text = ""
+    msg.TextXAlignment = Enum.TextXAlignment.Left
+    msg.Parent = frame
+
+    local toggle = Instance.new("TextButton")
+    toggle.Name = "ToggleButton"
+    toggle.Size = UDim2.new(0, 44, 0, 44)
+    toggle.Position = UDim2.new(1, -60, 0, 12)
+    toggle.AnchorPoint = Vector2.new(0,0)
+    toggle.BackgroundColor3 = Color3.fromRGB(30,30,40)
+    toggle.BorderSizePixel = 0
+    toggle.Font = Enum.Font.GothamBold
+    toggle.TextSize = 18
+    toggle.TextColor3 = Color3.fromRGB(240,240,240)
+    toggle.Text = "T"
+    toggle.Parent = screenGui
+
+    local clientSource = [[
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local remote = ReplicatedStorage:WaitForChild("]] .. remoteName .. [[")
+
+local screenGui = script.Parent
+local frame = screenGui:WaitForChild("MainFrame")
+local textbox = frame:WaitForChild("TeamTextBox")
+local confirm = frame:WaitForChild("ConfirmButton")
+local cancel = frame:WaitForChild("CancelButton")
+local msgLabel = frame:WaitForChild("MessageLabel")
+local toggle = screenGui:WaitForChild("ToggleButton")
+
+local function showMessage(text, timeout)
+    if msgLabel and msgLabel:IsA("TextLabel") then
+        msgLabel.Text = text or ""
+        if timeout and timeout > 0 then
+            delay(timeout, function()
+                if msgLabel then
+                    msgLabel.Text = ""
+                end
+            end)
+        end
+    else
+        warn("[c00kaha] "..tostring(text))
+    end
+end
+
+toggle.MouseButton1Click:Connect(function()
+    frame.Visible = not frame.Visible
+end)
+
+cancel.MouseButton1Click:Connect(function()
+    frame.Visible = false
+end)
+
+local function requestTeamChange(teamName)
+    if not teamName or teamName == "" then
+        showMessage("กรุณากรอกชื่อทีม", 3)
+        return
+    end
+    confirm.Active = false
+    confirm.AutoButtonColor = false
+    confirm.Text = "กำลังส่ง..."
+    remote:FireServer({ teamName = teamName })
+    delay(1.2, function()
+        if confirm then
+            confirm.Active = true
+            confirm.AutoButtonColor = true
+            confirm.Text = "ยืนยัน"
+        end
+    end)
+end
+
+confirm.MouseButton1Click:Connect(function()
+    local t = tostring(textbox.Text or ""):gsub("^%s*(.-)%s*$", "%1")
+    requestTeamChange(t)
+end)
+
+textbox.FocusLost:Connect(function(enter)
+    if enter then
+        local t = tostring(textbox.Text or ""):gsub("^%s*(.-)%s*$", "%1")
+        requestTeamChange(t)
+    end
+end)
+
+remote.OnClientEvent:Connect(function(response)
+    if type(response) ~= "table" then return end
+    if response.success then
+        showMessage(response.message or "สำเร็จ", 4)
+        delay(0.8, function()
+            pcall(function() frame.Visible = false end)
+        end)
+    else
+        showMessage(response.message or "เกิดข้อผิดพลาด", 4)
+    end
+end)
+
+player.CharacterAdded:Connect(function()
+    wait(0.7)
+    frame.Visible = false
+end)
+]]
+
+    local localScript = Instance.new("LocalScript")
+    localScript.Name = "c00kaha_Local"
+    localScript.Source = clientSource
+    localScript.Parent = screenGui
+end
+
+print("[c00kaha] System initialized. Place this Script in ServerScriptService. RemoteEvent:", remoteName, "DataStore:", DATASTORE_NAME)
