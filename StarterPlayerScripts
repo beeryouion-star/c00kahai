@@ -1,0 +1,83 @@
+local AccessKey = "12345"
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+local ScreenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+ScreenGui.Name = "TeamChangerGUI"
+ScreenGui.ResetOnSpawn = false
+
+local PasswordFrame = Instance.new("Frame", ScreenGui)
+PasswordFrame.Size = UDim2.new(0, 250, 0, 150)
+PasswordFrame.Position = UDim2.new(0.5, -125, 0.5, -75)
+PasswordFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+PasswordFrame.Active = true
+PasswordFrame.Draggable = true
+
+local PassTitle = Instance.new("TextLabel", PasswordFrame)
+PassTitle.Size = UDim2.new(1, 0, 0, 30)
+PassTitle.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+PassTitle.TextColor3 = Color3.new(1, 1, 1)
+PassTitle.Text = "🔐 ใส่รหัสเพื่อเปิดระบบเสกทีม"
+
+local PassBox = Instance.new("TextBox", PasswordFrame)
+PassBox.Size = UDim2.new(1, -20, 0, 35)
+PassBox.Position = UDim2.new(0, 10, 0, 45)
+PassBox.PlaceholderText = "รหัส..."
+PassBox.TextColor3 = Color3.new(0, 0, 0)
+PassBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+PassBox.Text = ""
+
+local ConfirmButton = Instance.new("TextButton", PasswordFrame)
+ConfirmButton.Size = UDim2.new(1, -20, 0, 35)
+ConfirmButton.Position = UDim2.new(0, 10, 0, 90)
+ConfirmButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+ConfirmButton.TextColor3 = Color3.new(1, 1, 1)
+ConfirmButton.Text = "ยืนยัน"
+
+local TeamFrame = Instance.new("Frame", ScreenGui)
+TeamFrame.Size = UDim2.new(0, 250, 0, 150)
+TeamFrame.Position = UDim2.new(0.5, -125, 0.5, -75)
+TeamFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+TeamFrame.Visible = false
+TeamFrame.Active = true
+TeamFrame.Draggable = true
+
+local TeamTitle = Instance.new("TextLabel", TeamFrame)
+TeamTitle.Size = UDim2.new(1, 0, 0, 30)
+TeamTitle.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+TeamTitle.TextColor3 = Color3.new(1, 1, 1)
+TeamTitle.Text = "⚔️ เปลี่ยนทีม (By c00kaha)"
+
+local TeamBox = Instance.new("TextBox", TeamFrame)
+TeamBox.Size = UDim2.new(1, -20, 0, 35)
+TeamBox.Position = UDim2.new(0, 10, 0, 45)
+TeamBox.PlaceholderText = "ใส่ชื่อทีม..."
+TeamBox.TextColor3 = Color3.new(0, 0, 0)
+TeamBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+TeamBox.Text = ""
+
+local ChangeButton = Instance.new("TextButton", TeamFrame)
+ChangeButton.Size = UDim2.new(1, -20, 0, 35)
+ChangeButton.Position = UDim2.new(0, 10, 0, 90)
+ChangeButton.BackgroundColor3 = Color3.fromRGB(0, 100, 255)
+ChangeButton.TextColor3 = Color3.new(1, 1, 1)
+ChangeButton.Text = "เปลี่ยนทีม"
+
+ConfirmButton.MouseButton1Click:Connect(function()
+	if PassBox.Text == AccessKey then
+		PasswordFrame.Visible = false
+		TeamFrame.Visible = true
+	else
+		PassBox.Text = "❌ รหัสผิด!"
+	end
+end)
+
+ChangeButton.MouseButton1Click:Connect(function()
+	local teamName = TeamBox.Text
+	if teamName ~= "" then
+		game.ReplicatedStorage.TeamChangeEvent:FireServer(teamName)
+		TeamBox.Text = "✅ เปลี่ยนทีมแล้ว!"
+	else
+		TeamBox.Text = "❌ กรุณาใส่ชื่อทีม!"
+	end
+end)
